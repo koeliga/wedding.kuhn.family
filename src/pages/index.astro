@@ -1,9 +1,10 @@
 ---
-import { Picture } from 'astro:assets';
+import { Picture, Font } from 'astro:assets';
 import sharp from 'sharp';
 import path from 'node:path';
 import { encode, decode } from 'blurhash';
 import proposal from '../assets/proposal.jpg';
+import proposalCutout from '../assets/proposal-transparent.png';
 
 // BlurHash placeholder (LQIP), generated at build time: encode the photo to a
 // BlurHash, then decode it to a small smooth raster embedded as base64 and painted
@@ -25,7 +26,7 @@ const lqipBuffer = await sharp(Buffer.from(decoded), { raw: { width: lqW, height
 	.toBuffer();
 const lqip = `data:image/webp;base64,${lqipBuffer.toString('base64')}`;
 
-const title = 'Sara & Sebastian — Wir heiraten! · 29. April 2028';
+const title = 'Sara & Sebastian · Hochzeit 29.4.2028';
 const description =
 	'Save the Date für die Hochzeit von Sara & Sebastian am 29. April 2028, nähe Bad Dürkheim in den Weinbergen der Pfalz. Die offizielle Einladung folgt.';
 const ogImage = new URL('/og.jpg', Astro.site);
@@ -42,6 +43,7 @@ const ogImage = new URL('/og.jpg', Astro.site);
 
 		<title>{title}</title>
 		<meta name="description" content={description} />
+		<meta name="robots" content="noindex, nofollow" />
 		<meta name="theme-color" content="#b7a794" />
 		<link rel="canonical" href={Astro.site} />
 
@@ -58,13 +60,9 @@ const ogImage = new URL('/og.jpg', Astro.site);
 		<meta name="twitter:description" content={description} />
 		<meta name="twitter:image" content={ogImage} />
 
-		<!-- Fonts -->
-		<link rel="preconnect" href="https://fonts.googleapis.com" />
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-		<link
-			href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant:ital,wght@0,400;0,500;1,400;1,500&display=swap"
-			rel="stylesheet"
-		/>
+		<!-- Fonts (self-hosted via Astro Fonts API, with metric-adjusted fallbacks) -->
+		<Font cssVariable="--font-cinzel" preload />
+		<Font cssVariable="--font-cormorant" preload={[{ style: 'italic' }]} />
 	</head>
 
 	<body>
@@ -84,6 +82,23 @@ const ogImage = new URL('/og.jpg', Astro.site);
 					fetchpriority="high"
 				/>
 				<div class="hero__scrim" aria-hidden="true"></div>
+
+				<!-- Same photo, cut out to just the two of them on a transparent
+				     background. Rendered with identical cover/position sizing so it
+				     registers pixel-perfectly on top of the couple in the photo below,
+				     then lifted a little faster than the scroll for a parallax depth. -->
+				<Picture
+					class="hero__cutout-img"
+					pictureAttributes={{ class: 'hero__cutout', 'aria-hidden': 'true' }}
+					src={proposalCutout}
+					alt=""
+					formats={['avif', 'webp']}
+					widths={[480, 768, 1080, 1408]}
+					sizes="100vw"
+					quality={85}
+					loading="eager"
+					fetchpriority="low"
+				/>
 
 				<div class="hero__frame" aria-hidden="true">
 					<span class="corner corner--tl"></span>
@@ -156,6 +171,42 @@ const ogImage = new URL('/og.jpg', Astro.site);
 				} else {
 					heroImg.addEventListener('load', () => heroImg.classList.add('is-loaded'), { once: true });
 					heroImg.addEventListener('error', () => heroImg.classList.add('is-instant', 'is-loaded'), { once: true });
+				}
+			}
+
+			// ── Parallax cutout: the same photo, cut down to just the two of
+			//    them, lifted off the background a touch faster than the page
+			//    scrolls — a subtle sense of depth. Registers exactly on the
+			//    couple at rest, so with JS off it's simply invisible. ──
+			const cutout = document.querySelector<HTMLElement>('.hero__cutout');
+			if (cutout) {
+				const cutoutImg = cutout.querySelector('img');
+				if (cutoutImg?.complete && cutoutImg.naturalWidth > 0) {
+					cutout.classList.add('is-instant', 'is-loaded');
+				} else {
+					cutoutImg?.addEventListener('load', () => cutout.classList.add('is-loaded'), { once: true });
+					cutoutImg?.addEventListener('error', () => cutout.classList.add('is-instant', 'is-loaded'), { once: true });
+				}
+
+				const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+				if (!reduceMotion) {
+					const FACTOR = 0.16; // extra lift per pixel scrolled — keep it subtle
+					let ticking = false;
+					const apply = () => {
+						cutout.style.transform = `translate3d(0, ${(-window.scrollY * FACTOR).toFixed(1)}px, 0)`;
+						ticking = false;
+					};
+					window.addEventListener(
+						'scroll',
+						() => {
+							if (!ticking) {
+								ticking = true;
+								requestAnimationFrame(apply);
+							}
+						},
+						{ passive: true },
+					);
+					apply();
 				}
 			}
 
@@ -254,8 +305,8 @@ const ogImage = new URL('/og.jpg', Astro.site);
 				--line: #e0d8c8;
 				--hero-bg: #b7a794;
 
-				--serif-display: 'Cinzel', Georgia, 'Times New Roman', serif;
-				--serif-body: 'Cormorant', Georgia, 'Times New Roman', serif;
+				--serif-display: var(--font-cinzel), Georgia, 'Times New Roman', serif;
+				--serif-body: var(--font-cormorant), Georgia, 'Times New Roman', serif;
 			}
 
 			* {
@@ -332,6 +383,36 @@ const ogImage = new URL('/og.jpg', Astro.site);
 					rgba(38, 34, 28, 0.16) 70%,
 					rgba(38, 34, 28, 0.64) 100%
 				);
+			}
+
+			/* Parallax cutout: the couple, lifted off the photo on scroll.
+			   Sits above the scrim so it stays bright and sharp while the
+			   original couple in the photo below is dimmed by the scrim —
+			   which also hides the "ghost" left behind as the cutout drifts. */
+			.hero__cutout {
+				position: absolute;
+				inset: 0;
+				z-index: 2;
+				pointer-events: none;
+				opacity: 0;
+				transition: opacity 0.8s ease;
+				will-change: transform;
+			}
+
+			.hero__cutout.is-loaded {
+				opacity: 1;
+			}
+
+			.hero__cutout.is-instant {
+				transition: none;
+			}
+
+			.hero__cutout-img {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+				object-position: center 20%;
+				display: block;
 			}
 
 			/* Decorative corner frame */
@@ -580,9 +661,11 @@ const ogImage = new URL('/og.jpg', Astro.site);
 					transform: none;
 				}
 
-				.hero__img {
+				.hero__img,
+				.hero__cutout {
 					opacity: 1;
 					transition: none;
+					transform: none;
 				}
 			}
 
