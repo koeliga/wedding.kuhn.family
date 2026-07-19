@@ -1,0 +1,600 @@
+---
+import { Picture } from 'astro:assets';
+import sharp from 'sharp';
+import path from 'node:path';
+import { encode, decode } from 'blurhash';
+import proposal from '../assets/proposal.jpg';
+
+// BlurHash placeholder (LQIP), generated at build time: encode the photo to a
+// BlurHash, then decode it to a small smooth raster embedded as base64 and painted
+// behind the hero image — so there's no solid-colour flash before it loads. No
+// client-side JS or decoder needed.
+const srcPath = path.join(process.cwd(), 'src/assets/proposal.jpg');
+const { data: rgba, info } = await sharp(srcPath)
+	.raw()
+	.ensureAlpha()
+	.resize(64, 64, { fit: 'inside' })
+	.toBuffer({ resolveWithObject: true });
+const hash = encode(new Uint8ClampedArray(rgba), info.width, info.height, 4, 3);
+
+const lqW = 40;
+const lqH = Math.round((lqW * info.height) / info.width);
+const decoded = decode(hash, lqW, lqH);
+const lqipBuffer = await sharp(Buffer.from(decoded), { raw: { width: lqW, height: lqH, channels: 4 } })
+	.webp({ quality: 70 })
+	.toBuffer();
+const lqip = `data:image/webp;base64,${lqipBuffer.toString('base64')}`;
+
+const title = 'Sara & Sebastian — Wir heiraten! · 29. April 2028';
+const description =
+	'Save the Date für die Hochzeit von Sara & Sebastian am 29. April 2028, nähe Bad Dürkheim in den Weinbergen der Pfalz. Die offizielle Einladung folgt.';
+const ogImage = new URL('/og.jpg', Astro.site);
+---
+
+<!doctype html>
+<html lang="de">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" href="/favicon.ico" />
+		<meta name="generator" content={Astro.generator} />
+
+		<title>{title}</title>
+		<meta name="description" content={description} />
+		<meta name="theme-color" content="#b7a794" />
+		<link rel="canonical" href={Astro.site} />
+
+		<!-- Open Graph / social sharing -->
+		<meta property="og:type" content="website" />
+		<meta property="og:locale" content="de_DE" />
+		<meta property="og:title" content="Sara & Sebastian — Wir heiraten!" />
+		<meta property="og:description" content={description} />
+		<meta property="og:image" content={ogImage} />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="Sara & Sebastian — Wir heiraten!" />
+		<meta name="twitter:description" content={description} />
+		<meta name="twitter:image" content={ogImage} />
+
+		<!-- Fonts -->
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant:ital,wght@0,400;0,500;1,400;1,500&display=swap"
+			rel="stylesheet"
+		/>
+	</head>
+
+	<body>
+		<main>
+			<!-- ───────────────────────── Hero ───────────────────────── -->
+			<section class="hero" aria-label="Save the Date">
+				<Picture
+					class="hero__img"
+					pictureAttributes={{ class: 'hero__pic', style: `background-image:url('${lqip}')` }}
+					src={proposal}
+					alt="Sara und Sebastian am Strand — der Moment der Verlobung"
+					formats={['avif', 'webp']}
+					widths={[480, 768, 1080, 1440, 1920, 2400]}
+					sizes="100vw"
+					quality={80}
+					loading="eager"
+					fetchpriority="high"
+				/>
+				<div class="hero__scrim" aria-hidden="true"></div>
+
+				<div class="hero__frame" aria-hidden="true">
+					<span class="corner corner--tl"></span>
+					<span class="corner corner--tr"></span>
+					<span class="corner corner--bl"></span>
+					<span class="corner corner--br"></span>
+				</div>
+
+				<div class="hero__content">
+					<div class="hero__top reveal">
+						<p class="eyebrow">Wir heiraten!</p>
+						<h1 class="names">Sara <span class="amp">&amp;</span> Sebastian</h1>
+					</div>
+
+					<div class="hero__bottom reveal reveal--delay">
+						<p class="ruled">
+							<span class="ruled__line"></span>
+							<span class="ruled__text">Save the Date</span>
+							<span class="ruled__line"></span>
+						</p>
+						<p class="hero__date">
+							<time datetime="2028-04-29">29. April 2028</time>
+						</p>
+					</div>
+				</div>
+			</section>
+
+			<!-- ─────────────────────── Details ──────────────────────── -->
+			<section class="details">
+				<div class="details__inner">
+					<p class="kicker">Wo wir feiern</p>
+					<h2 class="place">Nähe Bad Dürkheim,<br />Rheinland-Pfalz</h2>
+
+					<hr class="rule" />
+
+					<div class="countdown" id="countdown" role="group" aria-label="Zeit bis zur Hochzeit">
+						<div class="countdown__unit">
+							<span class="countdown__num" data-months>21</span>
+							<span class="countdown__label">Monate</span>
+						</div>
+						<span class="countdown__sep" aria-hidden="true"></span>
+						<div class="countdown__unit">
+							<span class="countdown__num" data-weeks>01</span>
+							<span class="countdown__label">Woche</span>
+						</div>
+						<span class="countdown__sep" aria-hidden="true"></span>
+						<div class="countdown__unit">
+							<span class="countdown__num" data-days>03</span>
+							<span class="countdown__label">Tage</span>
+						</div>
+					</div>
+
+					<hr class="rule" />
+
+					<p class="invitation">Mehr Infos folgen</p>
+
+					<button type="button" class="cal-btn" id="cal-btn">In den Kalender</button>
+				</div>
+			</section>
+		</main>
+
+		<script>
+			// ── Hero image: fade in over the BlurHash, but only when it has
+			//    to load. If it's already decoded (cache/instant), show it
+			//    right away — never hold it back just to reveal the blur. ──
+			const heroImg = document.querySelector<HTMLImageElement>('.hero__img');
+			if (heroImg) {
+				if (heroImg.complete && heroImg.naturalWidth > 0) {
+					heroImg.classList.add('is-instant', 'is-loaded');
+				} else {
+					heroImg.addEventListener('load', () => heroImg.classList.add('is-loaded'), { once: true });
+					heroImg.addEventListener('error', () => heroImg.classList.add('is-instant', 'is-loaded'), { once: true });
+				}
+			}
+
+			// ── Live countdown (months / weeks / days) ──────────────────
+			const TARGET = new Date(2028, 3, 29); // 29 April 2028 (month is 0-indexed)
+
+			function partsUntil(target: Date) {
+				const now = new Date();
+				now.setHours(0, 0, 0, 0);
+				if (now >= target) return { months: 0, weeks: 0, days: 0 };
+
+				let months = 0;
+				const cursor = new Date(now);
+				while (true) {
+					const next = new Date(cursor);
+					next.setMonth(next.getMonth() + 1);
+					if (next <= target) {
+						months++;
+						cursor.setMonth(cursor.getMonth() + 1);
+					} else break;
+				}
+				const dayMs = 86_400_000;
+				const restDays = Math.floor((target.getTime() - cursor.getTime()) / dayMs);
+				return { months, weeks: Math.floor(restDays / 7), days: restDays % 7 };
+			}
+
+			const pad = (n: number) => String(n).padStart(2, '0');
+			const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
+			const { months, weeks, days } = partsUntil(TARGET);
+			const root = document.getElementById('countdown');
+			if (root) {
+				const m = root.querySelector('[data-months]');
+				const w = root.querySelector('[data-weeks]');
+				const d = root.querySelector('[data-days]');
+				if (m) {
+					m.textContent = pad(months);
+					m.nextElementSibling!.textContent = plural(months, 'Monat', 'Monate');
+				}
+				if (w) {
+					w.textContent = pad(weeks);
+					w.nextElementSibling!.textContent = plural(weeks, 'Woche', 'Wochen');
+				}
+				if (d) {
+					d.textContent = pad(days);
+					d.nextElementSibling!.textContent = plural(days, 'Tag', 'Tage');
+				}
+			}
+
+			// ── Add to calendar (.ics download) ─────────────────────────
+			const btn = document.getElementById('cal-btn');
+			btn?.addEventListener('click', () => {
+				const stamp =
+					new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+				const ics = [
+					'BEGIN:VCALENDAR',
+					'VERSION:2.0',
+					'PRODID:-//wedding.kuhn.family//Save the Date//DE',
+					'CALSCALE:GREGORIAN',
+					'METHOD:PUBLISH',
+					'BEGIN:VEVENT',
+					'UID:sara-sebastian-2028-04-29@wedding.kuhn.family',
+					`DTSTAMP:${stamp}`,
+					'DTSTART;VALUE=DATE:20280429',
+					'DTEND;VALUE=DATE:20280430',
+					'SUMMARY:Hochzeit von Sara & Sebastian',
+					'DESCRIPTION:Save the Date! Die offizielle Einladung folgt.',
+					'LOCATION:Nähe Bad Dürkheim\\, Rheinland-Pfalz',
+					'TRANSP:TRANSPARENT',
+					'END:VEVENT',
+					'END:VCALENDAR',
+				].join('\r\n');
+
+				const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement('a');
+				a.href = url;
+				a.download = 'Sara-und-Sebastian-2028-04-29.ics';
+				document.body.appendChild(a);
+				a.click();
+				a.remove();
+				setTimeout(() => URL.revokeObjectURL(url), 1000);
+			});
+		</script>
+
+		<style>
+			:root {
+				--paper: #f3ede3;
+				--sand: #d9d2c4;
+				--ink: #4a4234;
+				--taupe: #8a7f66;
+				--taupe-dark: #6f6550;
+				--sage: #a7b79b;
+				--gold: #e9ce8c;
+				--mauve: #a08a7a;
+				--line: #e0d8c8;
+				--hero-bg: #b7a794;
+
+				--serif-display: 'Cinzel', Georgia, 'Times New Roman', serif;
+				--serif-body: 'Cormorant', Georgia, 'Times New Roman', serif;
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+
+			html {
+				-webkit-text-size-adjust: 100%;
+			}
+
+			body {
+				margin: 0;
+				background: var(--sand);
+				color: var(--ink);
+				font-family: var(--serif-body);
+			}
+
+			main {
+				display: block;
+			}
+
+			/* ───────────────────────── Hero ───────────────────────── */
+			.hero {
+				position: relative;
+				min-height: 100vh;
+				min-height: 100svh;
+				overflow: hidden;
+				background: var(--hero-bg);
+				display: flex;
+				flex-direction: column;
+				justify-content: space-between;
+				text-align: center;
+				color: var(--paper);
+				padding: clamp(3rem, 8vh, 6rem) clamp(1.15rem, 5vw, 4rem);
+			}
+
+			.hero__pic {
+				position: absolute;
+				inset: 0;
+				z-index: 0;
+				background-size: cover;
+				background-position: center 20%;
+				background-repeat: no-repeat;
+			}
+
+			.hero__img {
+				width: 100%;
+				height: 100%;
+				object-fit: cover;
+				object-position: center 20%;
+				display: block;
+				opacity: 0;
+				transition: opacity 0.8s ease;
+			}
+
+			.hero__img.is-loaded {
+				opacity: 1;
+			}
+
+			/* Already-cached image: reveal instantly, without the fade delay */
+			.hero__img.is-instant {
+				transition: none;
+			}
+
+			.hero__scrim {
+				position: absolute;
+				inset: 0;
+				z-index: 1;
+				background: linear-gradient(
+					180deg,
+					rgba(38, 34, 28, 0.58) 0%,
+					rgba(38, 34, 28, 0.12) 26%,
+					rgba(38, 34, 28, 0) 48%,
+					rgba(38, 34, 28, 0.16) 70%,
+					rgba(38, 34, 28, 0.64) 100%
+				);
+			}
+
+			/* Decorative corner frame */
+			.hero__frame {
+				position: absolute;
+				inset: clamp(1rem, 3.4vw, 2.25rem);
+				z-index: 2;
+				pointer-events: none;
+			}
+
+			.corner {
+				position: absolute;
+				width: clamp(24px, 3.5vw, 34px);
+				height: clamp(24px, 3.5vw, 34px);
+			}
+			.corner--tl {
+				top: 0;
+				left: 0;
+				border-top: 1px solid rgba(233, 206, 140, 0.95);
+				border-left: 1px solid rgba(233, 206, 140, 0.95);
+			}
+			.corner--tr {
+				top: 0;
+				right: 0;
+				border-top: 1px solid rgba(233, 206, 140, 0.95);
+				border-right: 1px solid rgba(233, 206, 140, 0.95);
+			}
+			.corner--bl {
+				bottom: 0;
+				left: 0;
+				border-bottom: 1px solid rgba(233, 206, 140, 0.95);
+				border-left: 1px solid rgba(233, 206, 140, 0.95);
+			}
+			.corner--br {
+				bottom: 0;
+				right: 0;
+				border-bottom: 1px solid rgba(233, 206, 140, 0.95);
+				border-right: 1px solid rgba(233, 206, 140, 0.95);
+			}
+
+			.hero__content {
+				position: relative;
+				z-index: 3;
+				display: contents;
+			}
+
+			.hero__top,
+			.hero__bottom {
+				position: relative;
+				z-index: 3;
+				width: 100%;
+			}
+
+			.eyebrow {
+				margin: 0;
+				font-family: var(--serif-body);
+				font-style: italic;
+				font-weight: 500;
+				font-size: clamp(1.375rem, 0.83rem + 2.23vw, 2.94rem);
+				color: #f6f0e6;
+				text-shadow: 0 1px 12px rgba(30, 22, 16, 0.55);
+			}
+
+			.names {
+				margin: 0.4rem 0 0;
+				font-family: var(--serif-display);
+				font-weight: 400;
+				font-size: clamp(1.75rem, 0.7rem + 5.6vw, 6rem);
+				line-height: 1.04;
+				letter-spacing: 0.01em;
+				white-space: nowrap;
+				text-shadow: 0 3px 22px rgba(30, 22, 16, 0.55);
+			}
+
+			.names .amp {
+				font-weight: 400;
+			}
+
+			.ruled {
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				gap: clamp(0.75rem, 2.5vw, 1.15rem);
+				margin: 0 0 clamp(0.75rem, 2vh, 1.1rem);
+			}
+			.ruled__line {
+				height: 1px;
+				width: clamp(28px, 7vw, 42px);
+				background: rgba(167, 183, 155, 0.9);
+			}
+			.ruled__text {
+				font-family: var(--serif-display);
+				font-weight: 500;
+				font-size: clamp(0.69rem, 0.34rem + 1.43vw, 1.69rem);
+				letter-spacing: 0.32em;
+				text-transform: uppercase;
+				text-shadow: 0 1px 10px rgba(30, 22, 16, 0.6);
+			}
+
+			.hero__date {
+				margin: 0;
+				font-family: var(--serif-display);
+				font-weight: 500;
+				font-size: clamp(1.5rem, 1.09rem + 1.69vw, 2.69rem);
+				letter-spacing: 0.06em;
+				text-shadow: 0 2px 14px rgba(30, 22, 16, 0.6);
+			}
+
+			/* ─────────────────────── Details ──────────────────────── */
+			.details {
+				background: var(--paper);
+				color: var(--ink);
+				padding: clamp(3rem, 9vh, 5.5rem) clamp(1.5rem, 6vw, 3rem);
+			}
+
+			.details__inner {
+				max-width: 40rem;
+				margin-inline: auto;
+				text-align: center;
+			}
+
+			.kicker {
+				margin: 0;
+				font-family: var(--serif-display);
+				font-weight: 500;
+				font-size: clamp(0.7rem, 0.62rem + 0.3vw, 0.8rem);
+				letter-spacing: 0.28em;
+				text-transform: uppercase;
+				color: var(--sage);
+			}
+
+			.place {
+				margin: 0.7rem 0 0;
+				font-family: var(--serif-body);
+				font-weight: 500;
+				font-size: clamp(1.5rem, 1.33rem + 0.71vw, 2rem);
+				line-height: 1.25;
+			}
+
+			.rule {
+				border: 0;
+				height: 1px;
+				background: var(--line);
+				margin: clamp(1.75rem, 4vh, 2.4rem) auto;
+				width: 100%;
+			}
+
+			.countdown {
+				display: flex;
+				align-items: stretch;
+				justify-content: center;
+				gap: clamp(1.1rem, 5vw, 2rem);
+			}
+
+			.countdown__unit {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				min-width: 3.2rem;
+			}
+
+			.countdown__num {
+				font-family: var(--serif-display);
+				font-weight: 500;
+				font-size: clamp(1.875rem, 1.66rem + 0.89vw, 2.5rem);
+				line-height: 1;
+				color: var(--ink);
+				font-variant-numeric: tabular-nums;
+			}
+
+			.countdown__label {
+				margin-top: 0.45rem;
+				font-family: var(--serif-display);
+				font-weight: 400;
+				font-size: clamp(0.55rem, 0.5rem + 0.2vw, 0.62rem);
+				letter-spacing: 0.24em;
+				text-transform: uppercase;
+				color: var(--mauve);
+			}
+
+			.countdown__sep {
+				width: 1px;
+				background: var(--line);
+				align-self: stretch;
+			}
+
+			.invitation {
+				margin: 0;
+				font-family: var(--serif-body);
+				font-style: italic;
+				font-size: clamp(1.25rem, 1.05rem + 0.55vw, 1.6rem);
+				color: var(--ink);
+			}
+
+			.cal-btn {
+				display: inline-block;
+				margin-top: clamp(1.4rem, 4vh, 2rem);
+				padding: 0.95em 2.1em;
+				background: transparent;
+				border: 1px solid var(--sage);
+				border-radius: 2px;
+				cursor: pointer;
+				font-family: var(--serif-display);
+				font-weight: 500;
+				font-size: clamp(0.66rem, 0.6rem + 0.28vw, 0.76rem);
+				letter-spacing: 0.24em;
+				text-transform: uppercase;
+				color: var(--ink);
+				transition:
+					background-color 0.25s ease,
+					color 0.25s ease,
+					border-color 0.25s ease;
+			}
+			.cal-btn:hover,
+			.cal-btn:focus-visible {
+				background: var(--sage);
+				border-color: var(--sage);
+				color: var(--paper);
+				outline: none;
+			}
+			.cal-btn:focus-visible {
+				outline: 2px solid var(--taupe);
+				outline-offset: 3px;
+			}
+
+			/* ─────────────────── Entrance animation ────────────────── */
+			.reveal {
+				opacity: 0;
+				transform: translateY(14px);
+				animation: rise 1s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+			}
+			.reveal--delay {
+				animation-delay: 0.22s;
+			}
+			@keyframes rise {
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				.reveal {
+					animation: none;
+					opacity: 1;
+					transform: none;
+				}
+
+				.hero__img {
+					opacity: 1;
+					transition: none;
+				}
+			}
+
+			/* Small phones: keep the countdown from feeling cramped */
+			@media (max-width: 360px) {
+				.countdown {
+					gap: 0.9rem;
+				}
+				.countdown__unit {
+					min-width: 2.8rem;
+				}
+			}
+		</style>
+	</body>
+</html>
