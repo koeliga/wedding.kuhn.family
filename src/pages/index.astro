@@ -4,7 +4,6 @@ import sharp from 'sharp';
 import path from 'node:path';
 import { encode, decode } from 'blurhash';
 import proposal from '../assets/proposal.jpg';
-import proposalCutout from '../assets/proposal-transparent.png';
 
 // BlurHash placeholder (LQIP), generated at build time: encode the photo to a
 // BlurHash, then decode it to a small smooth raster embedded as base64 and painted
@@ -83,23 +82,6 @@ const ogImage = new URL('/og.jpg', Astro.site);
 				/>
 				<div class="hero__scrim" aria-hidden="true"></div>
 
-				<!-- Same photo, cut out to just the two of them on a transparent
-				     background. Rendered with identical cover/position sizing so it
-				     registers pixel-perfectly on top of the couple in the photo below,
-				     then lifted a little faster than the scroll for a parallax depth. -->
-				<Picture
-					class="hero__cutout-img"
-					pictureAttributes={{ class: 'hero__cutout', 'aria-hidden': 'true' }}
-					src={proposalCutout}
-					alt=""
-					formats={['avif', 'webp']}
-					widths={[480, 768, 1080, 1408]}
-					sizes="100vw"
-					quality={85}
-					loading="eager"
-					fetchpriority="low"
-				/>
-
 				<div class="hero__frame" aria-hidden="true">
 					<span class="corner corner--tl"></span>
 					<span class="corner corner--tr"></span>
@@ -171,42 +153,6 @@ const ogImage = new URL('/og.jpg', Astro.site);
 				} else {
 					heroImg.addEventListener('load', () => heroImg.classList.add('is-loaded'), { once: true });
 					heroImg.addEventListener('error', () => heroImg.classList.add('is-instant', 'is-loaded'), { once: true });
-				}
-			}
-
-			// ── Parallax cutout: the same photo, cut down to just the two of
-			//    them, lifted off the background a touch faster than the page
-			//    scrolls — a subtle sense of depth. Registers exactly on the
-			//    couple at rest, so with JS off it's simply invisible. ──
-			const cutout = document.querySelector<HTMLElement>('.hero__cutout');
-			if (cutout) {
-				const cutoutImg = cutout.querySelector('img');
-				if (cutoutImg?.complete && cutoutImg.naturalWidth > 0) {
-					cutout.classList.add('is-instant', 'is-loaded');
-				} else {
-					cutoutImg?.addEventListener('load', () => cutout.classList.add('is-loaded'), { once: true });
-					cutoutImg?.addEventListener('error', () => cutout.classList.add('is-instant', 'is-loaded'), { once: true });
-				}
-
-				const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-				if (!reduceMotion) {
-					const FACTOR = 0.16; // extra lift per pixel scrolled — keep it subtle
-					let ticking = false;
-					const apply = () => {
-						cutout.style.transform = `translate3d(0, ${(-window.scrollY * FACTOR).toFixed(1)}px, 0)`;
-						ticking = false;
-					};
-					window.addEventListener(
-						'scroll',
-						() => {
-							if (!ticking) {
-								ticking = true;
-								requestAnimationFrame(apply);
-							}
-						},
-						{ passive: true },
-					);
-					apply();
 				}
 			}
 
@@ -383,36 +329,6 @@ const ogImage = new URL('/og.jpg', Astro.site);
 					rgba(38, 34, 28, 0.16) 70%,
 					rgba(38, 34, 28, 0.64) 100%
 				);
-			}
-
-			/* Parallax cutout: the couple, lifted off the photo on scroll.
-			   Sits above the scrim so it stays bright and sharp while the
-			   original couple in the photo below is dimmed by the scrim —
-			   which also hides the "ghost" left behind as the cutout drifts. */
-			.hero__cutout {
-				position: absolute;
-				inset: 0;
-				z-index: 2;
-				pointer-events: none;
-				opacity: 0;
-				transition: opacity 0.8s ease;
-				will-change: transform;
-			}
-
-			.hero__cutout.is-loaded {
-				opacity: 1;
-			}
-
-			.hero__cutout.is-instant {
-				transition: none;
-			}
-
-			.hero__cutout-img {
-				width: 100%;
-				height: 100%;
-				object-fit: cover;
-				object-position: center 20%;
-				display: block;
 			}
 
 			/* Decorative corner frame */
@@ -661,11 +577,9 @@ const ogImage = new URL('/og.jpg', Astro.site);
 					transform: none;
 				}
 
-				.hero__img,
-				.hero__cutout {
+				.hero__img {
 					opacity: 1;
 					transition: none;
-					transform: none;
 				}
 			}
 
